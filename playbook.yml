@@ -1,16 +1,33 @@
----
-# setup my macbook just the way I like it
+# Configure and deploy Apache
 
-- hosts: all
-  become: true
+- name: provision instance for Apache
+  hosts: localhost
+  connection: local
+  remote_user: ubuntu
+  gather_facts: false
+  vars:
+    key_name: ansible-test
+    region: us-east-2
+    image: ami-0e82959d4ed12de3f # Ubuntu 18.04
+    id: "web-app17"
+    sec_group: "{{ id }}-sec"
+    ec2_access_key: access_key
+    ec2_secret_key: secret_key
+  roles:
+    - aws
+
+- name: Sets up the project
+  hosts: launched
+  remote_user: ubuntu
+  become: yes
   vars:
     project_root_dir: "/srv/Practice"
     ssh_git_repo_url: "git@github.com:yii2-starter-kit/yii2-starter-kit.git"
     ssh_key_path: ~/.ssh/id_rsa
+    ansible_ssh_private_kid_rsae: "~/.ssh/ansible-test"
     mysql_root_password: password
-    host_user: vagrant
-    http_host: practice.local
+    host_user: ubuntu
+    http_host: practice57.plts.in
     project_name: Practice
-
   roles:
-      - name: setup
+    - setup
