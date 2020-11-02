@@ -9,7 +9,7 @@
     key_name: ansible-test
     region: us-east-2
     image: ami-0e82959d4ed12de3f # Ubuntu 18.04
-    id: "web-app17"
+    id: "practice41"
     sec_group: "{{ id }}-sec"
     ec2_access_key: access_key
     ec2_secret_key: secret_key
@@ -24,7 +24,7 @@
     project_root_dir: "/srv/Practice"
     ssh_git_repo_url: "git@github.com:yii2-starter-kit/yii2-starter-kit.git"
     ssh_key_path: ~/.ssh/id_rsa
-    ansible_ssh_private_kid_rsae: "~/.ssh/ansible-test"
+    ansible_ssh_private_key_file: "~/.ssh/ansible-test"
     mysql_root_password: password
     host_user: ubuntu
     http_host: practice57.plts.in
