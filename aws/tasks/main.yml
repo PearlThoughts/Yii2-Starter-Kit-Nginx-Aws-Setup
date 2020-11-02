@@ -70,8 +70,6 @@
   debug:
     msg: "{{ ec2 }}"
 
-- pause: seconds=15
-
 - name: Add new instance to host group
   add_host: hostname={{ item.public_ip }} groupname=launched
   with_items: '{{ eip.results }}'
