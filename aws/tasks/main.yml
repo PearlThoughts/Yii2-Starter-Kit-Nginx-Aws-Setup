@@ -1,83 +1,86 @@
 # AWS playbook
 ---
 
-- name: Get instances facts
-  ec2_instance_info:
-    aws_access_key: "{{ec2_access_key}}"
-    aws_secret_key: "{{ec2_secret_key}}"
-    region: "{{ region }}"
-  register: result
+# - name: Get instances facts
+#   ec2_instance_info:
+#     aws_access_key: "{{ec2_access_key}}"
+#     aws_secret_key: "{{ec2_secret_key}}"
+#     region: "{{ region }}"
+#   register: result
   
 # - name: Create a unique ID
 #   shell: perl -e 'open IN, "</usr/share/dict/words";rand($.) < 1 && ($n=$_) while <IN>;print $n'
 #   run_once: true
 #   register: ec2_id
 
-- name: Upload public key to AWS
-  ec2_key:
-    name: "{{ key_name }}"
-    key_material: "{{ lookup('file', '~/.ssh/ansible-test.pub') }}"
-    region: "{{ region }}"
-    aws_access_key: "{{ec2_access_key}}"
-    aws_secret_key: "{{ec2_secret_key}}"
+- name: Prepares ssl cert
+  include: ssl-cert.yml
 
-- name: Create security group
-  ec2_group:
-    name: "{{ sec_group }}"
-    description: "Sec group for app {{ id }}"
-    # vpc_id: 12345
-    region: "{{ region }}"
-    aws_access_key: "{{ec2_access_key}}"
-    aws_secret_key: "{{ec2_secret_key}}"
-    rules:
-      - proto: tcp
-        ports:
-          - 22
-          - 80
-          - 443
-        cidr_ip: 0.0.0.0/0
-        rule_desc: allow all on ssh/http ports
-  register: result_sec_group
+# - name: Upload public key to AWS
+#   ec2_key:
+#     name: "{{ key_name }}"
+#     key_material: "{{ lookup('file', '~/.ssh/ansible-test.pub') }}"
+#     region: "{{ region }}"
+#     aws_access_key: "{{ec2_access_key}}"
+#     aws_secret_key: "{{ec2_secret_key}}"
 
-- name: Provision instance(s)
-  ec2:
-    aws_access_key: "{{ec2_access_key}}"
-    aws_secret_key: "{{ec2_secret_key}}"
-    key_name: "{{ key_name }}"
-    id: "{{ id }}"
-    group_id: "{{ result_sec_group.group_id }}"
-    image: "{{ image }}"
-    instance_type: t2.micro
-    region: "{{ region }}"
-    wait: true
-    count: 1
-  register: ec2
+# - name: Create security group
+#   ec2_group:
+#     name: "{{ sec_group }}"
+#     description: "Sec group for app {{ id }}"
+#     # vpc_id: 12345
+#     region: "{{ region }}"
+#     aws_access_key: "{{ec2_access_key}}"
+#     aws_secret_key: "{{ec2_secret_key}}"
+#     rules:
+#       - proto: tcp
+#         ports:
+#           - 22
+#           - 80
+#           - 443
+#         cidr_ip: 0.0.0.0/0
+#         rule_desc: allow all on ssh/http ports
+#   register: result_sec_group
+
+# - name: Provision instance(s)
+#   ec2:
+#     aws_access_key: "{{ec2_access_key}}"
+#     aws_secret_key: "{{ec2_secret_key}}"
+#     key_name: "{{ key_name }}"
+#     id: "{{ id }}"
+#     group_id: "{{ result_sec_group.group_id }}"
+#     image: "{{ image }}"
+#     instance_type: t2.micro
+#     region: "{{ region }}"
+#     wait: true
+#     count: 1
+#   register: ec2
  
-- name: associate new elastic IPs with each of the instances
-  ec2_eip:
-    device_id: "{{ item }}"
-    region: "{{ region }}"
-    aws_access_key: "{{ec2_access_key}}"
-    aws_secret_key: "{{ec2_secret_key}}"
-  with_items: "{{ ec2.instance_ids }}"
-  register: eip
+# - name: associate new elastic IPs with each of the instances
+#   ec2_eip:
+#     device_id: "{{ item }}"
+#     region: "{{ region }}"
+#     aws_access_key: "{{ec2_access_key}}"
+#     aws_secret_key: "{{ec2_secret_key}}"
+#   with_items: "{{ ec2.instance_ids }}"
+#   register: eip
 
-- name: output the IP
-  debug:
-    msg: "{{ eip }}"
+# - name: output the IP
+#   debug:
+#     msg: "{{ eip }}"
 
-- name: output ec2
-  debug:
-    msg: "{{ ec2 }}"
+# - name: output ec2
+#   debug:
+#     msg: "{{ ec2 }}"
 
-- name: Add new instance to host group
-  add_host: hostname={{ item.public_ip }} groupname=launched
-  with_items: '{{ eip.results }}'
+# - name: Add new instance to host group
+#   add_host: hostname={{ item.public_ip }} groupname=launched
+#   with_items: '{{ eip.results }}'
 
-- name: Wait for SSH to come up
-  wait_for: host={{ item.public_ip }} port=22 delay=60 timeout=320 state=started
-  with_items: '{{ eip.results }}'
+# - name: Wait for SSH to come up
+#   wait_for: host={{ item.public_ip }} port=22 delay=60 timeout=320 state=started
+#   with_items: '{{ eip.results }}'
 
-- name: accept new ssh fingerprints                                         
-  shell: ssh-keyscan -H {{ item.public_ip }} >> ~/.ssh/known_hosts          
-  with_items: '{{ eip.results }}'
+# - name: accept new ssh fingerprints                                         
+#   shell: ssh-keyscan -H {{ item.public_ip }} >> ~/.ssh/known_hosts          
+#   with_items: '{{ eip.results }}'

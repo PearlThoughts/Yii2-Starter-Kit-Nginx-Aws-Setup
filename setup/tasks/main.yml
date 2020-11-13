@@ -20,6 +20,9 @@
 - name: configures PHP
   include: php/main.yml
 
+- name: Prepares ssl cert
+  include: ssl-cert.yml
+
 - name: configures Nginx
   include: nginx-conf.yml
 

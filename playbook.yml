@@ -1,33 +1,45 @@
 # Configure and deploy Apache
 
 - name: provision instance for Apache
-  hosts: localhost
-  connection: local
+  hosts: all
   remote_user: ubuntu
   gather_facts: false
   vars_files:
     - vars/env.yml
   vars:
+    allow_world_readable_tmpfiles: true
     key_name: ansible-test
+    remote_host: ansible-test
     region: us-east-2
     image: ami-0e82959d4ed12de3f # Ubuntu 18.04
-    id: "practice42"
+    id: "practice-akash-ajay"
     sec_group: "{{ id }}-sec"
+    remaining_days: 20
+    acme_directory: https://acme-staging-v02.api.letsencrypt.org/directory
+    # acme_directory: https://acme-v02.api.letsencrypt.org/directory
+    cert_name: "{{ app_slug }}.{{ app_domain}}"
+    intermediate_path: /etc/pki/letsencrypt/intermediate.pem
+    cert:
+      common_name: "{{ app_slug }}.{{ app_domain}}"
+      organization_name: PearlThoughts
+      email_address: "{{ letsencrypt_email }}"
+      subject_alt_name:
+      - "DNS:{{ app_slug }}.{{ app_domain}}"
   roles:
     - aws
 
-- name: Sets up the project
-  hosts: launched
-  remote_user: ubuntu
-  become: yes
-  vars:
-    project_root_dir: "/srv/Practice"
-    ssh_git_repo_url: "git@github.com:yii2-starter-kit/yii2-starter-kit.git"
-    ssh_key_path: ~/.ssh/id_rsa
-    ansible_ssh_private_key_file: "~/.ssh/ansible-test"
-    mysql_root_password: password
-    host_user: ubuntu
-    http_host: practice57.plts.in
-    project_name: Practice
-  roles:
-    - setup
+# - name: Sets up the project
+#   hosts: launched
+#   remote_user: ubuntu
+#   become: yes
+#   vars:
+#     project_root_dir: "/srv/Practice"
+#     ssh_git_repo_url: "git@github.com:yii2-starter-kit/yii2-starter-kit.git"
+#     ssh_key_path: ~/.ssh/id_rsa
+#     ansible_ssh_private_key_file: "~/.ssh/ansible-test"
+#     mysql_root_password: password
+#     host_user: ubuntu
+#     http_host: practice57.plts.in
+#     project_name: Practice
+#   roles:
+#     - setup

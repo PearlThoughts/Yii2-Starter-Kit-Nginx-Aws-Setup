@@ -1,0 +1,136 @@
+---
+# DESCRIPTION
+# get cert via letsencrypt
+#
+# - https://bitbucket.org/its-application-delivery/ansible-aws/src/master/ansible/roles/letsencrypt/tasks/main.yml?fileviewer=file-view-default
+# - http://docs.ansible.com/ansible/latest/modules/openssl_csr_module.html
+# - http://docs.ansible.com/ansible/latest/modules/letsencrypt_module.html
+# - https://letsencrypt.org/docs/staging-environment/
+# - name: Update apt cache
+#   apt:
+#     update_cache: yes
+#     cache_valid_time: 3600
+
+- name: Create certificate storage directory
+  delegate_to: "{{remote_host}}"
+  become: true
+  become_user: SenG
+  file:
+    dest: "{{item.path}}"
+    mode: 0750
+    state: directory
+  with_items:
+  - path: ~/letsencrypt
+  - path: ~/letsencrypt
+
+- name: create temporary directory
+  tempfile:
+    state: directory
+  register: tempdir
+
+# - name: Pull keys/files
+#   command: |
+#     /usr/bin/rsync --recursive "{{remote_host}}:~/letsencrypt" "{{tempdir.path}}"
+
+- name: Create RSA key to be used for ansible account
+  openssl_privatekey:
+    path: "{{tempdir.path}}/letsencrypt_account.pem"
+    size: 4096
+    type: RSA
+
+- name: Create RSA key to be used for certificate
+  openssl_privatekey:
+    path: "{{tempdir.path}}/{{cert_name}}.key"
+    size: 4096
+    type: RSA
+
+- name: report cert value
+  debug:
+    var: cert
+    verbosity: 1
+
+- name: Create CSR for certificate
+  openssl_csr:
+    path: "{{tempdir.path}}/{{cert_name}}.csr"
+    privatekey_path: "{{tempdir.path}}/{{cert_name}}.key"
+    country_name: IN
+    state_or_province_name: TN
+    organization_name: "{{cert.organization_name}}"
+    email_address: "{{cert.email_address}}"
+    common_name: "{{cert.common_name}}"
+    subject_alt_name: "{{cert.subject_alt_name}}"
+
+- name: Get ACME challenge
+  acme_certificate:
+    account_email: "{{cert.email_address}}"
+    account_key: "{{tempdir.path}}/letsencrypt_account.pem"
+    acme_directory: "{{acme_directory}}"
+    acme_version: 2
+    challenge: dns-01
+    chain_dest:  "{{tempdir.path}}/intermediate.pem"
+    csr: "{{tempdir.path}}/{{cert_name}}.csr"
+    dest: "{{tempdir.path}}/{{cert_name}}.cert"
+    terms_agreed: yes
+    remaining_days: "{{remaining_days}}"
+  register: acme_data
+
+- debug:
+    var: acme_data
+
+- name: Publish the challenge to DNS
+  route53:
+    zone: "{{ app_domain}}"
+    record: "{{ item.key }}"
+    type: TXT
+    ttl: 60
+    # Note: item.value is a list of TXT entries, and route53
+    # requires every entry to be enclosed in quotes
+    value: "{{ item.value | map('regex_replace', '^(.*)$', '\"\\1\"' ) | list }}"
+    state: present
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+    overwrite: true
+  with_dict: "{{acme_data.challenge_data_dns}}"
+  when: acme_data is changed
+
+- name: Wait a bit so that DNS replication happens
+  pause:
+    seconds: 60
+  when: acme_data is changed
+
+- name: Get certificate
+  acme_certificate:
+    account_email: "{{cert.email_address}}"
+    account_key: "{{tempdir.path}}/letsencrypt_account.pem"
+    acme_directory: "{{acme_directory}}"
+    acme_version: 2
+    challenge: dns-01
+    chain_dest:  "{{tempdir.path}}/intermediate.pem"
+    csr: "{{tempdir.path}}/{{cert_name}}.csr"
+    dest: "{{tempdir.path}}/{{cert_name}}.cert"
+    terms_agreed: yes
+    remaining_days: "{{remaining_days}}"
+    data: "{{acme_data}}"
+  when: acme_data is changed
+
+- name: Remove the challenge to DNS
+  route53:
+    zone: "{{ app_domain}}"
+    record: "{{ item.key }}"
+    type: TXT
+    ttl: 60
+    value: "{{ item.value | map('regex_replace', '^(.*)$', '\"\\1\"' ) | list }}"
+    state: absent
+    aws_access_key: "{{ aws_access_key }}"
+    aws_secret_key: "{{ aws_secret_key }}"
+  with_dict: "{{acme_data.challenge_data_dns}}"
+  when: acme_data.challenge_data_dns is defined
+
+- name: Upload keys/files
+  command: |
+    /usr/bin/rsync --recursive  "{{tempdir.path}}/" "{{remote_host}}:/etc/letsencrypt/"
+
+- name: remove temp folder
+  file:
+    state: absent
+    path: "{{tempdir.path}}"
